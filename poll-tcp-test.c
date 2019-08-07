@@ -35,19 +35,34 @@ int create_tcp_server(char *server_ip,int port)
         return sockfd;
 }
 
+struct pollfd fds[10];
+void init_pollfds()
+{
+	int i;
+	for(i=0;i<10;i++)
+		fds[i].fd=-1;
+}
+void add_to_fds(int fd)
+{
+	int i=0;
+	for(i=1;i<10;i++){
+		if(fds[i].fd<0)
+			break;
+	}
+	fds[i].fd=fd;
+	fds[i].events=POLLIN;		
+}
 int main(int argc,char * argv[])
 {
-	int fd,i,fdc=0;
+	int fd,i;
 	int connfd;
 	char buf[20]={0};
-	struct pollfd fds[10];
 	struct sockaddr cliaddr;
 	int clilen=sizeof(cliaddr);
+	init_pollfds();
 	fd=create_tcp_server("192.168.17.128",atoi(argv[1]));
 	fds[0].fd=fd;
 	fds[0].events=POLLIN;
-	for(i=1;i<10;i++)
-		fds[i].fd=-1;
 	while(1){
 		int ret=poll(fds,10,-1);
 		if(ret<1){	
@@ -58,14 +73,7 @@ int main(int argc,char * argv[])
 			connfd=accept(fd,(struct sockaddr*)&cliaddr,&clilen);
 			if(connfd>0){
 				printf("accept\n");
-				fdc++;
-				for(i=1;i<10;i++){
-					if(fds[i].fd<0){
-						break;
-					}
-				}
-				fds[i].fd=connfd;
-				fds[i].events=POLLIN;
+				add_to_fds(connfd);
 			}
 			else
 				printf("accept error\n");
@@ -73,6 +81,7 @@ int main(int argc,char * argv[])
 		for(i=1;i<10;i++){	
 			if(fds[i].revents & POLLIN){
 				printf("ret is %d\n",ret);
+				bzero(buf,20);
 				int len=recv(fds[i].fd,buf,20,0);
 				if(len<=0){
 					printf("client close\n");
