@@ -215,6 +215,7 @@ void tcpservertask_thread(int fd)
 	}
 }
 
+
 #define OPENMAX 11
 struct pollfd fd_clients[OPENMAX];
 void tcpservertask_poll(int fd)
@@ -270,10 +271,19 @@ void tcpservertask_poll(int fd)
 }
 
 
+#define ATS_SOCKET "/tmp/ats_socket"
 int create_server_socket()
 {
-	
-
+	int sockfd;
+	struct sockaddr_un myaddr;
+	unlink(ATS_SOCKET);
+	sockfd=socket(AF_UNIX,SOCK_STREAM,0);
+	myaddr.sun_family=AF_UNIX;
+	strncpy(myaddr.sun_path,ATS_SOCKET,sizeof(myaddr.sun_path)-1);
+	bind(sockfd,(struct sockaddr*)&myaddr,sizeof(myaddr));
+	listen(sockfd,1);
+	chmod(ATS_SOCKET,0777);
+	return sockfd;
 }
 
 int main(int argc,char *argv[])
@@ -290,9 +300,31 @@ int main(int argc,char *argv[])
         serverfd=create_tcp_server("192.168.17.128",20001);
         tcpservertask_thread(serverfd);
         close(serverfd);*/
-	int serverfd;
+	/*int serverfd;
         serverfd=create_tcp_server("192.168.17.128",atoi(argv[1]));
         tcpservertask_poll(serverfd);
-        close(serverfd);
+        close(serverfd);*/
+
+	//struct pollfd fds[10];
+	
+	char buff[20]={0};
+	int sockfd=create_server_socket();
+	struct sockaddr_un remaddr;
+	int clientfd;
+	int clilen=sizeof(remaddr);
+	while(1){
+		clientfd=accept(sockfd,(struct sockaddr*)&remaddr,&clilen);
+		printf("accept socket\n");
+		while(1){
+			int len=read(clientfd,buff,20);
+			 printf("socket get %s",buff);
+			write(clientfd,"hello",5);
+			if(len<=0){
+				printf("socket lose\n");
+				close(clientfd);
+				break;
+			}
+		}
+	}
 	return 1;
 }
