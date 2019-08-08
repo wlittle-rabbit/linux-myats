@@ -1,4 +1,3 @@
-
 #include <sys/un.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,14 +35,19 @@ int create_tcp_server(char *server_ip,int port)
 }
 
 struct pollfd fds[10];
-typedef fd_callback(int fd,short revents);
+int (*fds_func[10])(int fd, short revents);
+typedef int (*fds_callback)(int fd, short revents);
+
 void init_pollfds()
 {
 	int i;
-	for(i=0;i<10;i++)
+	for(i=0;i<10;i++){
 		fds[i].fd=-1;
+		fds_func[i]=NULL;
+	}
 }
-void add_to_fds(int fd)
+void add_to_fds(int fd, fds_callback cb)
+//void add_to_fds(int fd)
 {
 	int i=0;
 	for(i=1;i<10;i++){
@@ -52,6 +56,7 @@ void add_to_fds(int fd)
 	}
 	fds[i].fd=fd;
 	fds[i].events=POLLIN|POLLHUP;		
+	fds_func[i]=cb;
 }
 void remove_to_fds(int fd)
 {
@@ -63,6 +68,12 @@ void remove_to_fds(int fd)
 	fds[i].fd=-1;
 	fds[i].events=0;
 	fds[i].revents=0;
+	fds_func[i]=NULL;
+}
+void dispatch_fds()
+{
+	
+
 }
 int tcp_request_callback(int fd,short revents)
 {
@@ -107,14 +118,16 @@ int main(int argc,char * argv[])
 			connfd=accept(fd,(struct sockaddr*)&cliaddr,&clilen);
 			if(connfd>0){
 				printf("accept\n");
-				add_to_fds(connfd);
+				//add_to_fds(connfd);
+				add_to_fds(connfd,tcp_request_callback);
 			}
 			else
 				printf("accept error\n");
 		}
 		for(i=1;i<10;i++){	
 			if(fds[i].revents & (POLLIN|POLLHUP)){
-			 tcp_request_callback(fds[i].fd,fds[i].revents);
+			// tcp_request_callback(fds[i].fd,fds[i].revents);
+				fds_func[i](fds[i].fd,fds[i].revents);
 			}
 		}
 	}
