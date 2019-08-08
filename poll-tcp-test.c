@@ -12,6 +12,24 @@
 #include <sys/poll.h>
 #include <poll.h>
 
+int hello(int fd,char *buf,int len)
+{
+	printf("cmd:%s\n",buf);
+	write(fd,"hello",5);
+}
+
+typedef int (*handler)(int fd,char *buf,int len);
+struct cmd_handler{
+	char *cmd;
+	handler handler;
+	char *rsp;
+};
+struct cmd_handler request[]={
+	{"hello",hello},
+	{NULL,NULL},
+};
+
+
 int create_tcp_server(char *server_ip,int port)
 {
         int sockfd=-1;
@@ -79,8 +97,9 @@ void dispatch_fds()
 }
 int tcp_request_callback(int fd,short revents)
 {
-        char buf[20];
-        bzero(buf,20);
+	int i=0;
+        char readbuf[20];
+        bzero(readbuf,20);
         if(revents & POLLHUP){
                 printf("tcp connect close\n");
                 close(fd);
@@ -89,14 +108,24 @@ int tcp_request_callback(int fd,short revents)
         }
         if(!(revents & POLLIN))
                 return -1;
-        int len=recv(fd,buf,20,0);
+        int len=recv(fd,readbuf,20,0);
         if(len<=0){
                 printf(" read error or connect lose\n");
                 close(fd);
 		remove_to_fds(fd);
+		return 0;
         }
-        printf("%s\n",buf);
-        return 0;
+        printf("recv is %s\n",readbuf);
+	struct cmd_handler *ch=NULL;
+	ch = request;
+        while(ch && ch->cmd && (ch->handler||ch->rsp)){	
+		if(!strncmp(ch->cmd,readbuf,strlen(ch->cmd))){
+			ch->handler(fd,readbuf,len);
+			return 0;
+		}
+		ch++;
+	}
+	return 0;
 }
 int tcp_accept_callback(int fd,short revents)
 {
