@@ -37,7 +37,6 @@ int create_tcp_server(char *server_ip,int port)
 struct pollfd fds[10];
 int (*fds_func[10])(int fd, short revents);
 typedef int (*fds_callback)(int fd, short revents);
-
 void init_pollfds()
 {
 	int i;
@@ -47,7 +46,6 @@ void init_pollfds()
 	}
 }
 void add_to_fds(int fd, fds_callback cb)
-//void add_to_fds(int fd)
 {
 	int i=0;
 	for(i=1;i<10;i++){
@@ -72,8 +70,12 @@ void remove_to_fds(int fd)
 }
 void dispatch_fds()
 {
-	
-
+	int i=0;
+	for(i=0;i<10;i++){
+        	if(fds[i].revents & (POLLIN|POLLHUP)){
+                        fds_func[i](fds[i].fd,fds[i].revents);
+                }
+        }
 }
 int tcp_request_callback(int fd,short revents)
 {
@@ -89,46 +91,41 @@ int tcp_request_callback(int fd,short revents)
                 return -1;
         int len=recv(fd,buf,20,0);
         if(len<=0){
-                printf(" read error\n");
+                printf(" read error or connect lose\n");
                 close(fd);
 		remove_to_fds(fd);
         }
         printf("%s\n",buf);
         return 0;
 }
-
+int tcp_accept_callback(int fd,short revents)
+{
+	struct sockaddr cliaddr;
+	int clilen=sizeof(cliaddr);
+        int connfd=accept(fd,(struct sockaddr*)&cliaddr,&clilen);
+        if(connfd>0){
+		printf("accept\n");
+                add_to_fds(connfd,tcp_request_callback);
+        }
+        else
+                printf("accept error\n");
+	return 0;
+}
 int main(int argc,char * argv[])
 {
 	int fd,i;
-	int connfd;
-	char buf[20]={0};
-	struct sockaddr cliaddr;
-	int clilen=sizeof(cliaddr);
 	init_pollfds();
 	fd=create_tcp_server("192.168.17.128",atoi(argv[1]));
-	fds[0].fd=fd;
-	fds[0].events=POLLIN|POLLHUP;
+	//fds[0].fd=fd;
+	//fds[0].events=POLLIN|POLLHUP;
+	//fds_func[0]=tcp_accept_callback;
+	add_to_fds(fd,tcp_accept_callback);
 	while(1){
 		int ret=poll(fds,10,-1);
 		if(ret<1){	
 			continue;
 			printf("ret is %d\n",ret);
 		}
-		if(fds[0].revents & POLLIN){
-			connfd=accept(fd,(struct sockaddr*)&cliaddr,&clilen);
-			if(connfd>0){
-				printf("accept\n");
-				//add_to_fds(connfd);
-				add_to_fds(connfd,tcp_request_callback);
-			}
-			else
-				printf("accept error\n");
-		}
-		for(i=1;i<10;i++){	
-			if(fds[i].revents & (POLLIN|POLLHUP)){
-			// tcp_request_callback(fds[i].fd,fds[i].revents);
-				fds_func[i](fds[i].fd,fds[i].revents);
-			}
-		}
+		dispatch_fds();
 	}
 }
