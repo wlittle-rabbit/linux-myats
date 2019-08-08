@@ -36,6 +36,7 @@ int create_tcp_server(char *server_ip,int port)
 }
 
 struct pollfd fds[10];
+typedef fd_callback(int fd,short revents);
 void init_pollfds()
 {
 	int i;
@@ -50,8 +51,41 @@ void add_to_fds(int fd)
 			break;
 	}
 	fds[i].fd=fd;
-	fds[i].events=POLLIN;		
+	fds[i].events=POLLIN|POLLHUP;		
 }
+void remove_to_fds(int fd)
+{
+	int i=0;
+	for(;i<10;i++){
+		if(fds[i].fd==-1)
+			break;
+	}
+	fds[i].fd=-1;
+	fds[i].events=0;
+	fds[i].revents=0;
+}
+int tcp_request_callback(int fd,short revents)
+{
+        char buf[20];
+        bzero(buf,20);
+        if(revents & POLLHUP){
+                printf("tcp connect close\n");
+                close(fd);
+                remove_to_fds(fd);
+                return 0;
+        }
+        if(!(revents & POLLIN))
+                return -1;
+        int len=recv(fd,buf,20,0);
+        if(len<=0){
+                printf(" read error\n");
+                close(fd);
+		remove_to_fds(fd);
+        }
+        printf("%s\n",buf);
+        return 0;
+}
+
 int main(int argc,char * argv[])
 {
 	int fd,i;
@@ -62,7 +96,7 @@ int main(int argc,char * argv[])
 	init_pollfds();
 	fd=create_tcp_server("192.168.17.128",atoi(argv[1]));
 	fds[0].fd=fd;
-	fds[0].events=POLLIN;
+	fds[0].events=POLLIN|POLLHUP;
 	while(1){
 		int ret=poll(fds,10,-1);
 		if(ret<1){	
@@ -79,16 +113,8 @@ int main(int argc,char * argv[])
 				printf("accept error\n");
 		}
 		for(i=1;i<10;i++){	
-			if(fds[i].revents & POLLIN){
-				printf("ret is %d\n",ret);
-				bzero(buf,20);
-				int len=recv(fds[i].fd,buf,20,0);
-				if(len<=0){
-					printf("client close\n");
-					close(fds[i].fd);
-					fds[i].fd=-1;
-				}
-				printf("%s\n",buf);
+			if(fds[i].revents & (POLLIN|POLLHUP)){
+			 tcp_request_callback(fds[i].fd,fds[i].revents);
 			}
 		}
 	}
