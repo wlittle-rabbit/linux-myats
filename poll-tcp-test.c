@@ -26,6 +26,7 @@ struct cmd_handler{
 };
 struct cmd_handler request[]={
 	{"hello",hello},
+	{"cmd1",NULL,"this is cmd1"},
 	{NULL,NULL},
 };
 
@@ -120,7 +121,10 @@ int tcp_request_callback(int fd,short revents)
 	ch = request;
         while(ch && ch->cmd && (ch->handler||ch->rsp)){	
 		if(!strncmp(ch->cmd,readbuf,strlen(ch->cmd))){
-			ch->handler(fd,readbuf,len);
+			if(ch->handler)
+				ch->handler(fd,readbuf,len);
+			else
+				write(fd,ch->rsp,strlen(ch->rsp));
 			return 0;
 		}
 		ch++;
