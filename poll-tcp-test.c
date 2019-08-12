@@ -12,12 +12,79 @@
 #include <sys/poll.h>
 #include <poll.h>
 
+#define CBUF_LEN 100
+struct cycle_buffer{
+	unsigned int in;
+	unsigned int out;//必须为unsigned int 型，环形计数
+	unsigned int len;
+	unsigned char buf[CBUF_LEN];
+};
+struct cycle_buffer mybuff;
+int min(int a,int b)
+{
+	return a<=b?a:b;
+}
+void init_cbuff(struct cycle_buffer * cbuf)
+{
+	cbuf->in=0;
+	cbuf->out=0;
+	cbuf->len=CBUF_LEN;
+}
+/*``````````````*/
+/* 需要考虑存放数据长度是否大于可用空间
+    数据是否需要分两端保存
+	上次刚好写到末尾*/
+/*```````````````*/
+int put_to_cbuff(struct cycle_buffer *cbuf,char *buf,int len)
+{
+	int l;
+	if(len>(CBUF_LEN-cbuf->in+cbuf->out))
+	{
+		printf("put the data length more than buffer's valid len\n");
+		len=min(len,CBUF_LEN-cbuf->in+cbuf->out);
+	}
+	l=min(len,CBUF_LEN-cbuf->in);
+	memcpy(cbuf->buf+(cbuf->in),buf,l);//buffer一般是2的n次方，要处理数据写到末尾情况
+	memcpy(cbuf->buf,buf+l,len-l);//切换到头部了
+	cbuf->in=cbuf->in+len;
+	return len;
+}
+int get_from_cbuff(struct cycle_buffer *cbuf,char *buf,int len)
+{
+	int l;
+	if(len>(cbuf->in-cbuf->out))
+        {
+                printf("get the data length more than buffer's valid len\n");
+                len=min(len,cbuf->in-cbuf->out);
+        }
+	l=min(len,CBUF_LEN-cbuf->out);
+	memcpy(buf,cbuf->buf,l);
+	memcpy(buf+l,cbuf->buf,len-l);//第二段
+	cbuf->out=cbuf->out+len;
+	return len;
+}
+
 int hello(int fd,char *buf,int len)
 {
 	printf("cmd:%s\n",buf);
 	write(fd,"hello",5);
 }
-
+int mynetread(int fd,char *buf,int len)
+{
+	char buff[100]={0};
+//	printf("MYNETREAD:%s\n",buf);
+	get_from_cbuff(&mybuff,buff,len);
+	printf("%s\n",buff);
+}
+int mynetwrite(int fd,char *buf,int len)
+{
+//	printf("MYNETWRITE:%s\n",buf);
+	char temp[20]="a23456789";
+	char buff[20]={0};
+	put_to_cbuff(&mybuff,temp,strlen(temp));
+	get_from_cbuff(&mybuff,buff,strlen(temp));
+	printf("%s\n",buff);
+}
 typedef int (*handler)(int fd,char *buf,int len);
 struct cmd_handler{
 	char *cmd;
@@ -26,6 +93,8 @@ struct cmd_handler{
 };
 struct cmd_handler request[]={
 	{"hello",hello},
+	{"READ",mynetread},
+	{"WRITE",mynetwrite},
 	{"cmd1",NULL,"this is cmd1"},
 	{NULL,NULL},
 };
@@ -99,8 +168,9 @@ void dispatch_fds()
 int tcp_request_callback(int fd,short revents)
 {
 	int i=0;
-        char readbuf[20];
-        bzero(readbuf,20);
+	int readlen=100;
+        char readbuf[readlen];
+        bzero(readbuf,readlen);
         if(revents & POLLHUP){
                 printf("tcp connect close\n");
                 close(fd);
@@ -109,7 +179,7 @@ int tcp_request_callback(int fd,short revents)
         }
         if(!(revents & POLLIN))
                 return -1;
-        int len=recv(fd,readbuf,20,0);
+        int len=recv(fd,readbuf,readlen,0);
         if(len<=0){
                 printf(" read error or connect lose\n");
                 close(fd);
@@ -146,12 +216,10 @@ int tcp_accept_callback(int fd,short revents)
 }
 int main(int argc,char * argv[])
 {
+	init_cbuff(&mybuff);	
 	int fd,i;
 	init_pollfds();
 	fd=create_tcp_server("192.168.17.128",atoi(argv[1]));
-	//fds[0].fd=fd;
-	//fds[0].events=POLLIN|POLLHUP;
-	//fds_func[0]=tcp_accept_callback;
 	add_to_fds(fd,tcp_accept_callback);
 	while(1){
 		int ret=poll(fds,10,-1);
