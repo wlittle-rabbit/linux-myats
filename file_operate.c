@@ -86,7 +86,7 @@ char* replace_str_multi(char *str,char *strdest,char *strnew)
         int len1=strlen(strdest);
         int len2=strlen(strnew);
         printf("%d,%d\n",len1,len2);
-        if((p=strstr(str,strdest))!=NULL){
+        while((p=strstr(temp,strdest))!=NULL){
                 while(temp!=p){
                         *res=*temp;
                         res++;
@@ -101,7 +101,11 @@ char* replace_str_multi(char *str,char *strdest,char *strnew)
                         res++;
                 }
                 *res=*temp;
-                str=result;
+		temp=str;
+		res=result;
+                for(i=0;i<strlen(result);i++){
+			temp[i]=res[i];
+		}
         }
         printf("%s\n",result);
                 return result;
@@ -121,6 +125,6 @@ int main(int argc,char *argv[])
 {
 	//copyfile2("/home/jjw/ttemp2/1.txt","/home/jjw/ttemp2/2.txt");
 	char str[20]="123abc456abc789";	
-	char* res=replace_str_1(str,"abc","xyz");
+	char* res=replace_str_multi(str,"abc","xyzk");
 	printf("%s\n",res);
 }
