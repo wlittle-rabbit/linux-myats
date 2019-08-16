@@ -34,29 +34,79 @@ int copyfile2(char *path,char* newfile)
 	fclose(fd_old);
         fclose(fd_new);
 }
-int replace_str(char *str,char *strdest,char *strnew)
+int replace_str_samelen(char *str,char *strdest,char *strnew,int len)
 {
-	char *p=strstr(str,strdest);
-	char *p1=str;
+	char *p;
 	int i=0;
+	while((p=strstr(str,strdest))!=NULL){
+		for(i=0;i<len;i++){
+			*p=strnew[i];
+			p++;
+		}
+	}
+		return 1;	
+}
+char* replace_str_1(char *str,char *strdest,char *strnew)
+{
+        char *p;
+	char *res;
+	char *result=res;
+	char *temp=str;
+        int i=0;
 	int len1=strlen(strdest);
 	int len2=strlen(strnew);
-	if(p!=NULL){
-		while(p1!=p){
-			*p1=str[i]
-			p1++;
-			i++;
+	printf("%d,%d\n",len1,len2);
+        if((p=strstr(str,strdest))!=NULL){
+		while(temp!=p){
+			*res=*temp;
+			res++;
+			temp++;
 		}
-		for(i=0;i<len2;i++){
-			*p1=strnew[i];
-			p1++;
-		}	
-		
-		return 1;	
-	}
-	else
-	 return -1;
+		temp=temp+len1;
+		for(i=0;i<len2;i++)
+			*res++=strnew[i];
+		while(*temp!='\0'){
+			*res=*temp;
+			temp++;
+			res++;
+		}
+		*res=*temp;
+		str=result;
+        }
+	printf("%s\n",result);
+                return result;
 }
+char* replace_str_multi(char *str,char *strdest,char *strnew)
+{
+        char *p;
+        char *res;
+        char *result=res;
+        char *temp=str;
+        int i=0;
+        int len1=strlen(strdest);
+        int len2=strlen(strnew);
+        printf("%d,%d\n",len1,len2);
+        if((p=strstr(str,strdest))!=NULL){
+                while(temp!=p){
+                        *res=*temp;
+                        res++;
+                        temp++;
+                }
+                temp=temp+len1;
+                for(i=0;i<len2;i++)
+                        *res++=strnew[i];
+                while(*temp!='\0'){
+                        *res=*temp;
+                        temp++;
+                        res++;
+                }
+                *res=*temp;
+                str=result;
+        }
+        printf("%s\n",result);
+                return result;
+}
+
 int replace_infile(char* path,char* newfile,char *oldstr,char *newstr)
 {
 	FILE *fd_old,*fd_new;
@@ -70,5 +120,7 @@ int replace_infile(char* path,char* newfile,char *oldstr,char *newstr)
 int main(int argc,char *argv[])
 {
 	//copyfile2("/home/jjw/ttemp2/1.txt","/home/jjw/ttemp2/2.txt");
-	replace_str("1234567890abc123","abc","123");
+	char str[20]="123abc456abc789";	
+	char* res=replace_str_1(str,"abc","xyz");
+	printf("%s\n",res);
 }
