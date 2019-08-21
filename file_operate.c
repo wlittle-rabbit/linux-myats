@@ -3,6 +3,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
 int copyfile(char* path,char* newfile)
 {
 	int fd_old,fd_new;
@@ -111,20 +114,27 @@ char* replace_str_multi(char *str,char *strdest,char *strnew)
                 return result;
 }
 
-int replace_infile(char* path,char* newfile,char *oldstr,char *newstr)
+int find_dev_name(char *path,char *predev)
 {
-	FILE *fd_old,*fd_new;
-	char c[1024]={0};
-	int readlen;
-	fd_old=fopen(path,"r");
-	fd_new=fopen(newfile,"w");
-	readlen=fread(c,1,1024,fd_old);
-	
+	struct dirent *de;
+	DIR *d=opendir(path);
+	if(d==NULL)
+		return -1;
+	while( (de=readdir(d))){
+		if(de->d_type == DT_DIR || de->d_name[0]=='.')//DT_DIR目录类型
+			continue;
+		if(strstr(de->d_name,predev)!=NULL){
+			closedir(d);
+			printf("find the dev\n");
+			return 0;
+		}
+	}
+	closedir(d);
+	return -1;
 }
 int main(int argc,char *argv[])
 {
-	//copyfile2("/home/jjw/ttemp2/1.txt","/home/jjw/ttemp2/2.txt");
-	char str[20]="123abc456abc789";	
-	char* res=replace_str_multi(str,"abc","xyzk");
-	printf("%s\n",res);
+	printf("%s\n",argv[1]);
+	if(find_dev_name(argv[1],"null")==-1)
+		printf("not find dev\n");
 }
